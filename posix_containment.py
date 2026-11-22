@@ -98,6 +98,13 @@ def _root_path(value: Path) -> Path:
 def initialize_sandbox(root_value: Path) -> Dict[str, str]:
     """Mark an empty, non-system directory as an explicit containment test root."""
     root = _root_path(root_value)
+    if hasattr(os, "geteuid") and os.geteuid() == 0:
+        raise ContainmentError("sandbox initialization must run as an unprivileged user, not root")
+    root_info = root.stat()
+    if hasattr(os, "geteuid") and root_info.st_uid != os.geteuid():
+        raise ContainmentError("sandbox root must be owned by the current operator")
+    if stat.S_IMODE(root_info.st_mode) & 0o022:
+        raise ContainmentError("sandbox root must not be group- or world-writable")
     protected = [
         Path("/etc"), Path("/usr"), Path("/var"), Path("/bin"), Path("/sbin"),
         Path("/lib"), Path("/lib64"), Path("/boot"), Path("/proc"), Path("/sys"),
@@ -134,6 +141,16 @@ def _require_sandbox_root(root: Path) -> None:
         raise ContainmentError("cannot read sandbox marker: " + str(exc))
     if content != SANDBOX_MARKER_CONTENT:
         raise ContainmentError("sandbox marker content is invalid")
+    if hasattr(os, "geteuid") and os.geteuid() == 0:
+        raise ContainmentError("containment mutations must run as an unprivileged user, not root")
+    root_info = root.stat()
+    marker_info = marker.stat()
+    if hasattr(os, "geteuid") and (
+        root_info.st_uid != os.geteuid() or marker_info.st_uid != os.geteuid()
+    ):
+        raise ContainmentError("sandbox root and marker must be owned by the current operator")
+    if stat.S_IMODE(root_info.st_mode) & 0o022 or stat.S_IMODE(marker_info.st_mode) & 0o077:
+        raise ContainmentError("sandbox root or marker permissions are too broad")
 
 def _relative_path(value: str) -> Path:
     path = Path(value)
@@ -204,12 +221,16 @@ def _state_paths(root: Path, create: bool = False) -> Dict[str, Path]:
         "approvals": state / "approvals",
         "records": state / "records",
     }
-    if create:
-        for directory in paths.values():
-            if directory == state or directory.parent == state:
-                directory.mkdir(mode=0o700, exist_ok=True)
-                if directory.is_symlink() or not directory.is_dir():
-                    raise ContainmentError("unsafe state directory: " + str(directory))
+    for directory in paths.values():
+        if create and (directory == state or directory.parent == state):
+            directory.mkdir(mode=0o700, exist_ok=True)
+        if directory.is_symlink() or not directory.is_dir():
+            raise ContainmentError("unsafe or missing state directory: " + str(directory))
+        info = directory.stat()
+        if hasattr(os, "geteuid") and info.st_uid != os.geteuid():
+            raise ContainmentError("state directory is not owned by the current operator: " + str(directory))
+        if stat.S_IMODE(info.st_mode) & 0o077:
+            raise ContainmentError("state directory permissions must be private (0700): " + str(directory))
     return paths
 
 
@@ -295,7 +316,7 @@ def _validate_plan(value: Any) -> Dict[str, Any]:
     if set(value["source_identity"]) != identity_keys:
         raise ContainmentError("plan source identity has an invalid shape")
     for field, number in value["source_identity"].items():
-        if isinstance(number, bool) or not isinstance(number, int) or number < 0:
+        if isinstance(number, bool) or not isinstance(number, int) or (number < 0 and field != "mtime_ns"):
             raise ContainmentError("plan source identity field is invalid: " + field)
     if value["source_identity"]["link_count"] != 1:
         raise ContainmentError("plan source identity must describe a single-link file")
