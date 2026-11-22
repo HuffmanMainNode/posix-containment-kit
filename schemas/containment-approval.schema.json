@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:huffman:cas-xdp:containment-approval:1.0",
+  "title": "CAS-XDP POSIX Containment Approval",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "operation_id", "plan_sha256", "approved_at"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "operation_id": { "type": "string", "format": "uuid" },
+    "plan_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "approved_at": { "type": "string", "format": "date-time" }
+  }
+}
