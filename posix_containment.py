@@ -10,6 +10,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import stat
 import uuid
 from datetime import datetime, timezone
@@ -266,18 +267,48 @@ def _validate_plan(value: Any) -> Dict[str, Any]:
         raise ContainmentError("plan has an invalid shape")
     if value["schema_version"] != SCHEMA_VERSION:
         raise ContainmentError("unsupported plan schema version")
-    if value["operation"] not in {"quarantine", "restore"}:
+    if not isinstance(value["operation"], str) or value["operation"] not in {"quarantine", "restore"}:
         raise ContainmentError("unsupported plan operation")
-    if value["plan_sha256"] != _plan_hash(value):
-        raise ContainmentError("plan integrity check failed")
+    for field in (
+        "operation_id", "root", "source_relative", "destination_relative",
+        "target_relative", "snapshot_relative", "prepared_at", "related_operation_id",
+    ):
+        if not isinstance(value[field], str):
+            raise ContainmentError("plan field must be a string: " + field)
+    try:
+        uuid.UUID(value["operation_id"])
+        if value["related_operation_id"]:
+            uuid.UUID(value["related_operation_id"])
+        prepared_at = datetime.fromisoformat(value["prepared_at"].replace("Z", "+00:00"))
+        if prepared_at.tzinfo is None:
+            raise ValueError("timezone required")
+    except ValueError as exc:
+        raise ContainmentError("plan UUID or timestamp field is invalid: " + str(exc))
+    if not Path(value["root"]).is_absolute():
+        raise ContainmentError("plan root must be an absolute path")
+    for field in ("source_relative", "destination_relative", "target_relative", "snapshot_relative"):
+        if not value[field]:
+            raise ContainmentError("plan path field must be non-empty: " + field)
     if not isinstance(value["source_identity"], dict):
         raise ContainmentError("plan source identity is invalid")
-    if not isinstance(value["artifact_sha256"], str) or len(value["artifact_sha256"]) != 64:
-        raise ContainmentError("plan digest is invalid")
+    identity_keys = {"device", "inode", "size_bytes", "mtime_ns", "mode", "link_count"}
+    if set(value["source_identity"]) != identity_keys:
+        raise ContainmentError("plan source identity has an invalid shape")
+    for field, number in value["source_identity"].items():
+        if isinstance(number, bool) or not isinstance(number, int) or number < 0:
+            raise ContainmentError("plan source identity field is invalid: " + field)
+    if value["source_identity"]["link_count"] != 1:
+        raise ContainmentError("plan source identity must describe a single-link file")
     if isinstance(value["size_bytes"], bool) or not isinstance(value["size_bytes"], int) or value["size_bytes"] < 0:
         raise ContainmentError("plan size is invalid")
+    if value["source_identity"]["size_bytes"] != value["size_bytes"]:
+        raise ContainmentError("plan size does not match source identity")
+    for field in ("artifact_sha256", "snapshot_sha256", "plan_sha256"):
+        if not isinstance(value[field], str) or not re.fullmatch(r"[a-f0-9]{64}", value[field]):
+            raise ContainmentError("plan digest is invalid: " + field)
+    if value["plan_sha256"] != _plan_hash(value):
+        raise ContainmentError("plan integrity check failed")
     return value
-
 
 def _load_plan(path: Path) -> tuple[Dict[str, Any], Path, Dict[str, Path]]:
     raw = read_json(path)
