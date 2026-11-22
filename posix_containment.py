@@ -306,6 +306,22 @@ def _validate_plan(value: Any) -> Dict[str, Any]:
     for field in ("artifact_sha256", "snapshot_sha256", "plan_sha256"):
         if not isinstance(value[field], str) or not re.fullmatch(r"[a-f0-9]{64}", value[field]):
             raise ContainmentError("plan digest is invalid: " + field)
+    if value["operation"] == "quarantine":
+        if (
+            value["source_relative"] != value["target_relative"]
+            or not value["destination_relative"].startswith(STATE_DIR + "/quarantine/")
+            or not value["snapshot_relative"].startswith(STATE_DIR + "/snapshots/")
+            or value["related_operation_id"] != ""
+        ):
+            raise ContainmentError("quarantine plan paths or relationship are inconsistent")
+    else:
+        if (
+            value["destination_relative"] != value["target_relative"]
+            or not value["source_relative"].startswith(STATE_DIR + "/snapshots/")
+            or not value["snapshot_relative"].startswith(STATE_DIR + "/rollback-snapshots/")
+            or not value["related_operation_id"]
+        ):
+            raise ContainmentError("restore plan paths or relationship are inconsistent")
     if value["plan_sha256"] != _plan_hash(value):
         raise ContainmentError("plan integrity check failed")
     return value
@@ -459,7 +475,7 @@ def prepare_rollback(plan_path: Path) -> Path:
     if not original_record_path.exists():
         raise ContainmentError("record the verified quarantine outcome before preparing rollback")
     original_record = read_json(original_record_path)
-    if (
+    if not isinstance(original_record, dict) or (
         original_record.get("status") != "verified"
         or original_record.get("plan_sha256") != original["plan_sha256"]
         or original_record.get("operation") != "quarantine"
@@ -533,11 +549,22 @@ def _require_approval(plan: Dict[str, Any], state: Dict[str, Path]) -> None:
     if not approval_path.exists():
         raise ContainmentError("explicit operator approval is required before apply")
     approval = read_json(approval_path)
+    if not isinstance(approval, dict) or set(approval) != {
+        "schema_version", "operation_id", "plan_sha256", "approved_at"
+    }:
+        raise ContainmentError("approval record has an invalid shape")
     if (
-        approval.get("operation_id") != plan["operation_id"]
-        or approval.get("plan_sha256") != plan["plan_sha256"]
+        approval["schema_version"] != SCHEMA_VERSION
+        or approval["operation_id"] != plan["operation_id"]
+        or approval["plan_sha256"] != plan["plan_sha256"]
     ):
         raise ContainmentError("approval does not match this exact plan")
+    try:
+        approved_at = datetime.fromisoformat(approval["approved_at"].replace("Z", "+00:00"))
+        if approved_at.tzinfo is None:
+            raise ValueError("timezone required")
+    except (AttributeError, ValueError) as exc:
+        raise ContainmentError("approval timestamp is invalid: " + str(exc))
 
 
 
