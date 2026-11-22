@@ -431,8 +431,12 @@ def prepare_rollback(plan_path: Path) -> Path:
     if not original_record_path.exists():
         raise ContainmentError("record the verified quarantine outcome before preparing rollback")
     original_record = read_json(original_record_path)
-    if original_record.get("status") != "verified":
-        raise ContainmentError("rollback preparation requires a verified quarantine outcome")
+    if (
+        original_record.get("status") != "verified"
+        or original_record.get("plan_sha256") != original["plan_sha256"]
+        or original_record.get("operation") != "quarantine"
+    ):
+        raise ContainmentError("rollback preparation requires a matching verified quarantine outcome")
 
     target_path = _safe_path(root, original["target_relative"], allow_missing=True)
     if target_path.exists():
@@ -504,6 +508,30 @@ def _require_approval(plan: Dict[str, Any], state: Dict[str, Path]) -> None:
         raise ContainmentError("approval does not match this exact plan")
 
 
+
+def _move_noreplace(source: Path, destination: Path, expected_identity: Dict[str, int]) -> None:
+    """Move a regular file without allowing an existing destination to be replaced."""
+    try:
+        os.link(str(source), str(destination), follow_symlinks=False)
+    except FileExistsError:
+        raise ContainmentError("destination already exists; refusing to overwrite")
+    except OSError as exc:
+        raise ContainmentError("filesystem cannot perform a safe no-replace move: " + str(exc))
+    linked_identity = dict(expected_identity)
+    linked_identity["link_count"] = expected_identity["link_count"] + 1
+    try:
+        if _file_identity(destination.lstat()) != linked_identity:
+            destination.unlink(missing_ok=True)
+            raise ContainmentError("source identity changed during no-replace move")
+        if _file_identity(source.lstat()) != linked_identity:
+            destination.unlink(missing_ok=True)
+            raise ContainmentError("source path changed during no-replace move")
+        source.unlink()
+    except OSError as exc:
+        raise ContainmentError(
+            "partial move: destination link may exist while source remains; inspect both paths before recovery: " + str(exc)
+        )
+
 def apply_plan(plan_path: Path) -> Dict[str, Any]:
     plan, root, state = _load_plan(plan_path)
     _require_approval(plan, state)
@@ -517,14 +545,12 @@ def apply_plan(plan_path: Path) -> Dict[str, Any]:
         raise ContainmentError("source file bytes changed after plan preparation")
     if sha256_file(snapshot) != plan["snapshot_sha256"] or snapshot.stat().st_size != plan["size_bytes"]:
         raise ContainmentError("prepared rollback snapshot failed integrity verification")
-    if destination.exists():
-        raise ContainmentError("destination already exists; refusing to overwrite")
     destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     if destination.parent.is_symlink():
         raise ContainmentError("destination parent must not be a symlink")
     if destination.parent.resolve(strict=True) != root and root not in destination.parent.resolve(strict=True).parents:
         raise ContainmentError("destination escapes configured root")
-    os.replace(str(source), str(destination))
+    _move_noreplace(source, destination, plan["source_identity"])
     if sha256_file(destination) != plan["artifact_sha256"]:
         raise ContainmentError("partial apply: moved file digest mismatch; retain plan and snapshot for recovery")
     return {
@@ -560,6 +586,7 @@ def verify_plan(plan_path: Path) -> Dict[str, Any]:
 
 def record_outcome(plan_path: Path) -> Dict[str, Any]:
     plan, root, state = _load_plan(plan_path)
+    _require_approval(plan, state)
     verification = verify_plan(plan_path)
     record = {
         "schema_version": SCHEMA_VERSION,
