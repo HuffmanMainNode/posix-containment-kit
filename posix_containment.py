@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional
 SCHEMA_VERSION = "1.0"
 STATE_DIR = ".cas-xdp-state"
 SANDBOX_MARKER = ".cas-xdp-sandbox"
-SANDBOX_MARKER_CONTENT = "CAS-XDP POSIX CONTAINMENT SANDBOX v1\\n"
+SANDBOX_MARKER_CONTENT = "CAS-XDP POSIX CONTAINMENT SANDBOX v1\n"
 PLAN_KEYS = {
     "schema_version", "operation_id", "operation", "root",
     "source_relative", "destination_relative", "target_relative",
