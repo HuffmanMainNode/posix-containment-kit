@@ -237,5 +237,20 @@ class ContainmentTests(unittest.TestCase):
         self.assertTrue(self.target.exists())
 
 
+    def test_private_state_directory_permissions_are_enforced(self):
+        state = self.root / containment.STATE_DIR
+        state.mkdir(mode=0o755)
+        with self.assertRaises(containment.ContainmentError):
+            containment.prepare_quarantine(self.root, "sample.txt")
+        self.assertTrue(self.target.exists())
+
+    def test_negative_file_mtime_is_valid_plan_metadata(self):
+        os.utime(self.target, ns=(1000000000, -1000000000))
+        plan = containment.prepare_quarantine(self.root, "sample.txt")
+        loaded = containment.read_json(plan)
+        self.assertLess(loaded["source_identity"]["mtime_ns"], 0)
+        self.assertEqual(containment._validate_plan(loaded)["operation"], "quarantine")
+
+
 if __name__ == "__main__":
     unittest.main()
