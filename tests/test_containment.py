@@ -2,6 +2,7 @@ import json
 import os
 import tempfile
 import unittest
+import jsonschema
 from pathlib import Path
 from unittest.mock import patch
 
@@ -189,6 +190,30 @@ class ContainmentTests(unittest.TestCase):
         containment.record_outcome(restore_plan)
         self.assertEqual(self.target.read_bytes(), original)
         self.assertEqual(quarantined.read_bytes(), b"quarantine copy altered")
+
+
+    def test_generated_plan_approval_and_record_match_versioned_schemas(self):
+        schemas_dir = Path(__file__).resolve().parents[1] / "schemas"
+
+        def validate(schema_name, instance):
+            schema = json.loads((schemas_dir / schema_name).read_text(encoding="utf-8"))
+            validator = jsonschema.Draft202012Validator(
+                schema, format_checker=jsonschema.FormatChecker()
+            )
+            validator.validate(instance)
+
+        plan_path = containment.prepare_quarantine(self.root, "sample.txt")
+        plan = containment.read_json(plan_path)
+        validate("containment-plan.schema.json", plan)
+
+        self.approve(plan_path)
+        approval_path = self.root / containment.STATE_DIR / "approvals" / (plan["operation_id"] + ".json")
+        validate("containment-approval.schema.json", containment.read_json(approval_path))
+
+        containment.apply_plan(plan_path)
+        record_result = containment.record_outcome(plan_path)
+        record_path = self.root / record_result["record"]
+        validate("containment-record.schema.json", containment.read_json(record_path))
 
 
 if __name__ == "__main__":
