@@ -8,12 +8,18 @@
     "url": "https://github.com/HuffmanMainNode/posix-containment-kit"
   },
   "contract_version": "1.0",
-  "lifecycle_state": "planned",
+  "lifecycle_state": "prototype",
   "capabilities": [
-    "planned unprivileged local host inspection",
-    "planned staged local containment plan generation",
-    "planned pre-change rollback snapshot preparation",
-    "planned apply, verify, and rollback operations after explicit approval"
+    "prototype: read-only local inventory of regular files with SHA-256 digests",
+    "prototype: explicit initialization of an empty, non-system, operator-owned sandbox root",
+    "prototype: regular single-link file quarantine inside an initialized sandbox",
+    "prototype: pre-change rollback snapshot and versioned SHA-256-bound plan",
+    "prototype: exact typed operator approval bound to the plan hash",
+    "prototype: separate apply, verify, and outcome-record stages",
+    "prototype: separately approved restore from the pre-change snapshot with quarantine evidence retained",
+    "not implemented: process termination or service control",
+    "not implemented: firewall, routing, socket, or interface mutation",
+    "not implemented: privilege escalation or remote host operations"
   ],
   "negative_scope": [
     "remote exploitation",
@@ -25,39 +31,57 @@
   ],
   "platforms": [
     {
-      "target": "POSIX-compatible local hosts",
+      "target": "Ubuntu 24.04 with Python 3.9 through 3.13",
+      "status": "verified",
+      "notes": "CI matrix passed all unit tests and schema checks on Ubuntu 24.04 for Python 3.9, 3.10, 3.11, 3.12, and 3.13."
+    },
+    {
+      "target": "Other POSIX-compatible operating systems and filesystems",
       "status": "planned",
-      "notes": "Target only; operating-system and privilege behavior has not been implemented or tested."
+      "notes": "Not tested. No cross-platform or filesystem compatibility claim is made."
     }
   ],
   "dependencies": {
     "build": [
-      "Python 3 standard-library toolchain (target; version not yet verified)"
+      "Python 3.9+ toolchain"
     ],
     "runtime": [
-      "Python 3 standard library (intended core; not yet implemented)"
+      "Python standard library"
     ],
     "optional": [
-      "Platform-specific system utilities, individually detected and documented",
-      "Privilege escalation only through explicit operator-controlled invocation"
+      "jsonschema==4.23.0 for development and CI schema validation only"
     ]
   },
   "interfaces": [
-    "Versioned containment plan (not yet defined)",
-    "Versioned rollback snapshot (not yet defined)"
+    "CLI: init-root, inspect, prepare, show, approve, apply, verify, record, prepare-rollback",
+    "Versioned JSON containment plan schema v1.0",
+    "Versioned JSON operator approval schema v1.0",
+    "Versioned JSON containment outcome record schema v1.0",
+    "Sandbox-local state directory .cas-xdp-state"
   ],
   "verification": {
-    "highest_evidence_tier": "none",
+    "highest_evidence_tier": "TIER-2",
     "claims": [
       {
-        "claim": "Repository initialization and contract baseline are present.",
-        "status": "unverified",
-        "evidence": []
+        "claim": "Read-only inventory and sandbox-scoped file quarantine/restore workflow with explicit approval and pre-change snapshots.",
+        "status": "verified",
+        "evidence": [
+          "https://github.com/HuffmanMainNode/posix-containment-kit/actions/runs/44976821177"
+        ]
       },
       {
-        "claim": "Executable behavior and platform compatibility.",
-        "status": "unverified",
-        "evidence": []
+        "claim": "Twenty-three deterministic unit tests and generated plan/approval/record schema validation.",
+        "status": "verified",
+        "evidence": [
+          "https://github.com/HuffmanMainNode/posix-containment-kit/actions/runs/44976821177"
+        ]
+      },
+      {
+        "claim": "Python 3.9 through 3.13 execution on Ubuntu 24.04.",
+        "status": "verified",
+        "evidence": [
+          "https://github.com/HuffmanMainNode/posix-containment-kit/actions/runs/44976821177"
+        ]
       }
     ]
   }
