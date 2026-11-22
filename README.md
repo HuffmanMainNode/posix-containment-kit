@@ -90,3 +90,7 @@ python3 -m unittest discover -v
 This is a prototype, not a production endpoint security product. Approval files and plan hashes protect against accidental plan drift, not a privileged local attacker who can alter the sandbox state. Filesystem races with a concurrent hostile writer are not fully eliminated on every POSIX filesystem. Snapshot metadata preservation is limited to file mode and timestamps; ownership, ACLs, extended attributes, and filesystem-specific metadata are not guaranteed. A no-replace hard-link move is required; if the filesystem does not support it, the operation is blocked without a fallback.
 
 CI currently verifies 23 tests across Python 3.9 through 3.13 on Ubuntu 24.04. Other operating systems and filesystems remain untested. See [SECURITY.md](SECURITY.md) and [CONTRACT.md](CONTRACT.md).
+
+## Prototype release record
+
+See [PROTOTYPE-RELEASE.md](PROTOTYPE-RELEASE.md) for the verified source commit, evidence ceiling, supported prototype scope, limitations, and next milestone. This document stages a prototype handoff; it does not create a GitHub Release or claim production readiness.
