@@ -66,21 +66,21 @@
         "claim": "Read-only inventory and sandbox-scoped file quarantine/restore workflow with explicit approval and pre-change snapshots.",
         "status": "verified",
         "evidence": [
-          "https://github.com/HuffmanMainNode/posix-containment-kit/actions/runs/44976821177"
+          "https://github.com/HuffmanMainNode/posix-containment-kit/actions/runs/44976874176"
         ]
       },
       {
         "claim": "Twenty-three deterministic unit tests and generated plan/approval/record schema validation.",
         "status": "verified",
         "evidence": [
-          "https://github.com/HuffmanMainNode/posix-containment-kit/actions/runs/44976821177"
+          "https://github.com/HuffmanMainNode/posix-containment-kit/actions/runs/44976874176"
         ]
       },
       {
         "claim": "Python 3.9 through 3.13 execution on Ubuntu 24.04.",
         "status": "verified",
         "evidence": [
-          "https://github.com/HuffmanMainNode/posix-containment-kit/actions/runs/44976821177"
+          "https://github.com/HuffmanMainNode/posix-containment-kit/actions/runs/44976874176"
         ]
       }
     ]
