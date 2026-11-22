@@ -1,0 +1,64 @@
+{
+  "schema_version": "1.0",
+  "project": "CAS-XDP",
+  "repository": {
+    "owner": "HuffmanMainNode",
+    "name": "posix-containment-kit",
+    "visibility": "public",
+    "url": "https://github.com/HuffmanMainNode/posix-containment-kit"
+  },
+  "contract_version": "1.0",
+  "lifecycle_state": "planned",
+  "capabilities": [
+    "planned unprivileged local host inspection",
+    "planned staged local containment plan generation",
+    "planned pre-change rollback snapshot preparation",
+    "planned apply, verify, and rollback operations after explicit approval"
+  ],
+  "negative_scope": [
+    "remote exploitation",
+    "outbound scanning (except explicitly authorized bounded artifact retrieval in cas-threat-index)",
+    "brute-force routines",
+    "counter-attack and retaliation",
+    "silent privileged mutation",
+    "fabricated or simulated live operational evidence"
+  ],
+  "platforms": [
+    {
+      "target": "POSIX-compatible local hosts",
+      "status": "planned",
+      "notes": "Target only; operating-system and privilege behavior has not been implemented or tested."
+    }
+  ],
+  "dependencies": {
+    "build": [
+      "Python 3 standard-library toolchain (target; version not yet verified)"
+    ],
+    "runtime": [
+      "Python 3 standard library (intended core; not yet implemented)"
+    ],
+    "optional": [
+      "Platform-specific system utilities, individually detected and documented",
+      "Privilege escalation only through explicit operator-controlled invocation"
+    ]
+  },
+  "interfaces": [
+    "Versioned containment plan (not yet defined)",
+    "Versioned rollback snapshot (not yet defined)"
+  ],
+  "verification": {
+    "highest_evidence_tier": "none",
+    "claims": [
+      {
+        "claim": "Repository initialization and contract baseline are present.",
+        "status": "unverified",
+        "evidence": []
+      },
+      {
+        "claim": "Executable behavior and platform compatibility.",
+        "status": "unverified",
+        "evidence": []
+      }
+    ]
+  }
+}
