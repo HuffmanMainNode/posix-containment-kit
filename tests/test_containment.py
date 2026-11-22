@@ -13,6 +13,7 @@ class ContainmentTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name) / "root"
         self.root.mkdir()
+        containment.initialize_sandbox(self.root)
         self.target = self.root / "sample.txt"
         self.target.write_bytes(b"controlled test fixture\n")
 
