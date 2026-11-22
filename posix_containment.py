@@ -441,15 +441,19 @@ def prepare_rollback(plan_path: Path) -> Path:
     target_path = _safe_path(root, original["target_relative"], allow_missing=True)
     if target_path.exists():
         raise ContainmentError("original target path is occupied; refusing to overwrite it")
-    quarantine_path = _safe_path(root, original["destination_relative"])
-    info = _require_regular_file(quarantine_path)
-    if sha256_file(quarantine_path) != original["artifact_sha256"]:
-        raise ContainmentError("quarantined file no longer matches the original plan")
+    original_snapshot = _snapshot_path(root, original["snapshot_relative"])
+    if (
+        sha256_file(original_snapshot) != original["artifact_sha256"]
+        or original_snapshot.stat().st_size != original["size_bytes"]
+    ):
+        raise ContainmentError("original rollback snapshot is unavailable or failed integrity verification")
+
+    # Restore from the pre-change snapshot, not from the quarantined copy.
+    # The quarantined copy remains in place as retained evidence.
     return _create_plan(
-        root, "restore", original["destination_relative"], original["target_relative"],
+        root, "restore", original["snapshot_relative"], original["target_relative"],
         original["target_relative"], "rollback-snapshots", original["operation_id"],
     )
-
 
 def show_plan(plan_path: Path) -> Dict[str, Any]:
     plan, root, _ = _load_plan(plan_path)
@@ -457,8 +461,8 @@ def show_plan(plan_path: Path) -> Dict[str, Any]:
         impact = "Move one regular file from the configured root into the local quarantine directory."
         rollback = "Restore the original bytes from the prepared snapshot through a separately approved restore plan."
     else:
-        impact = "Move one quarantined regular file back to its original relative path."
-        rollback = "A pre-restore snapshot of the quarantined bytes is stored before approval."
+        impact = "Restore the original bytes from the prepared pre-change snapshot to the original relative path. The quarantined copy is retained as evidence."
+        rollback = "A second snapshot of the restore source is prepared before approval; the retained quarantine copy is not deleted."
     return {
         "stage": "impact_review",
         "operation": plan["operation"],
