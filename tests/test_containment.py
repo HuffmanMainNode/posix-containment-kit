@@ -150,5 +150,27 @@ class ContainmentTests(unittest.TestCase):
             containment.initialize_sandbox(Path("/etc"))
 
 
+    def test_existing_quarantine_destination_is_never_overwritten(self):
+        plan = containment.prepare_quarantine(self.root, "sample.txt")
+        self.approve(plan)
+        loaded = containment.read_json(plan)
+        destination = self.root / loaded["destination_relative"]
+        destination.write_bytes(b"pre-existing destination")
+        with self.assertRaises(containment.ContainmentError):
+            containment.apply_plan(plan)
+        self.assertTrue(self.target.exists())
+        self.assertEqual(destination.read_bytes(), b"pre-existing destination")
+
+    def test_tampered_rollback_snapshot_blocks_apply(self):
+        plan = containment.prepare_quarantine(self.root, "sample.txt")
+        self.approve(plan)
+        loaded = containment.read_json(plan)
+        snapshot = self.root / loaded["snapshot_relative"]
+        snapshot.write_bytes(b"tampered snapshot")
+        with self.assertRaises(containment.ContainmentError):
+            containment.apply_plan(plan)
+        self.assertTrue(self.target.exists())
+
+
 if __name__ == "__main__":
     unittest.main()
