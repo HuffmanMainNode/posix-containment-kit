@@ -21,6 +21,8 @@ from typing import Any, Dict, List, Optional
 
 SCHEMA_VERSION = "1.0"
 STATE_DIR = ".cas-xdp-state"
+SANDBOX_MARKER = ".cas-xdp-sandbox"
+SANDBOX_MARKER_CONTENT = "CAS-XDP POSIX CONTAINMENT SANDBOX v1\\n"
 PLAN_KEYS = {
     "schema_version", "operation_id", "operation", "root",
     "source_relative", "destination_relative", "target_relative",
@@ -93,6 +95,47 @@ def _root_path(value: Path) -> Path:
         raise ContainmentError("configured root must be an existing directory")
     return root
 
+
+
+def initialize_sandbox(root_value: Path) -> Dict[str, str]:
+    """Mark an empty, non-system directory as an explicit containment test root."""
+    root = _root_path(root_value)
+    protected = [
+        Path("/etc"), Path("/usr"), Path("/var"), Path("/bin"), Path("/sbin"),
+        Path("/lib"), Path("/lib64"), Path("/boot"), Path("/proc"), Path("/sys"),
+        Path("/dev"), Path("/root"),
+    ]
+    for protected_path in protected:
+        if root == protected_path or protected_path in root.parents or root in protected_path.parents:
+            raise ContainmentError("system paths and their ancestors/descendants cannot be initialized as a sandbox")
+    marker = root / SANDBOX_MARKER
+    if marker.exists() or marker.is_symlink():
+        if marker.is_symlink() or not marker.is_file() or marker.read_text(encoding="utf-8") != SANDBOX_MARKER_CONTENT:
+            raise ContainmentError("existing sandbox marker is invalid")
+        return {"status": "already_initialized", "root": str(root)}
+    if any(root.iterdir()):
+        raise ContainmentError("sandbox initialization requires an empty directory")
+    try:
+        descriptor = os.open(str(marker), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(SANDBOX_MARKER_CONTENT)
+            handle.flush()
+            os.fsync(handle.fileno())
+    except OSError as exc:
+        raise ContainmentError("cannot initialize sandbox marker: " + str(exc))
+    return {"status": "initialized", "root": str(root)}
+
+
+def _require_sandbox_root(root: Path) -> None:
+    marker = root / SANDBOX_MARKER
+    if marker.is_symlink() or not marker.is_file():
+        raise ContainmentError("containment mutations require an explicitly initialized sandbox root")
+    try:
+        content = marker.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ContainmentError("cannot read sandbox marker: " + str(exc))
+    if content != SANDBOX_MARKER_CONTENT:
+        raise ContainmentError("sandbox marker content is invalid")
 
 def _relative_path(value: str) -> Path:
     path = Path(value)
@@ -243,6 +286,7 @@ def _load_plan(path: Path) -> tuple[Dict[str, Any], Path, Dict[str, Path]]:
     raw = read_json(path)
     plan = _validate_plan(raw)
     root = _root_path(Path(plan["root"]))
+    _require_sandbox_root(root)
     state = _state_paths(root)
     expected_path = state["plans"] / (plan["operation_id"] + ".json")
     if path.resolve(strict=True) != expected_path.resolve(strict=True):
@@ -366,6 +410,7 @@ def inspect_root(root_value: Path) -> Dict[str, Any]:
 
 def prepare_quarantine(root_value: Path, target_relative: str) -> Path:
     root = _root_path(root_value)
+    _require_sandbox_root(root)
     target = _relative_path(target_relative)
     if STATE_DIR in target.parts:
         raise ContainmentError("the reserved containment state directory cannot be a target")
@@ -544,6 +589,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     commands = parser.add_subparsers(dest="command", required=True)
 
+    init_root = commands.add_parser("init-root", help="mark an empty directory as an explicit test sandbox")
+    init_root.add_argument("root", type=Path)
+
     inspect = commands.add_parser("inspect", help="read-only inventory of regular files under a root")
     inspect.add_argument("root", type=Path)
 
@@ -575,6 +623,9 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Optional[List[str]] = None) -> int:
     args = build_parser().parse_args(argv)
     try:
+        if args.command == "init-root":
+            _print_json(initialize_sandbox(args.root))
+            return 0
         if args.command == "inspect":
             _print_json(inspect_root(args.root))
             return 0
