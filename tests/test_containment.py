@@ -32,8 +32,8 @@ class ContainmentTests(unittest.TestCase):
         after = sorted(p.relative_to(self.root).as_posix() for p in self.root.rglob("*"))
         self.assertEqual(before, after)
         self.assertFalse(result["host_mutations_performed"])
-        self.assertEqual(result["regular_files_observed"], 1)
-        self.assertEqual(result["entries"][0]["path"], "sample.txt")
+        self.assertEqual(result["regular_files_observed"], 2)
+        self.assertIn("sample.txt", [item["path"] for item in result["entries"]])
 
     def test_prepare_creates_plan_and_snapshot_without_moving_target(self):
         plan = containment.prepare_quarantine(self.root, "sample.txt")
@@ -128,6 +128,25 @@ class ContainmentTests(unittest.TestCase):
         with self.assertRaises(containment.ContainmentError):
             containment.prepare_rollback(plan)
         self.assertEqual(self.target.read_bytes(), b"operator-created file")
+
+
+    def test_unmarked_root_cannot_be_used_for_containment(self):
+        unmarked = self.root.parent / "unmarked"
+        unmarked.mkdir()
+        (unmarked / "sample.txt").write_text("not opted in", encoding="utf-8")
+        with self.assertRaises(containment.ContainmentError):
+            containment.prepare_quarantine(unmarked, "sample.txt")
+
+    def test_sandbox_initialization_requires_empty_directory(self):
+        nonempty = self.root.parent / "nonempty"
+        nonempty.mkdir()
+        (nonempty / "keep.txt").write_text("keep", encoding="utf-8")
+        with self.assertRaises(containment.ContainmentError):
+            containment.initialize_sandbox(nonempty)
+
+    def test_system_directory_cannot_be_initialized(self):
+        with self.assertRaises(containment.ContainmentError):
+            containment.initialize_sandbox(Path("/etc"))
 
 
 if __name__ == "__main__":
