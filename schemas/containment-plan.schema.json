@@ -29,7 +29,7 @@
         "device": { "type": "integer", "minimum": 0 },
         "inode": { "type": "integer", "minimum": 0 },
         "size_bytes": { "type": "integer", "minimum": 0 },
-        "mtime_ns": { "type": "integer", "minimum": 0 },
+        "mtime_ns": { "type": "integer" },
         "mode": { "type": "integer", "minimum": 0 },
         "link_count": { "const": 1 }
       }
