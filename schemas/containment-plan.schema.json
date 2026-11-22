@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:huffman:cas-xdp:containment-plan:1.0",
+  "title": "CAS-XDP POSIX Containment Plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "operation_id", "operation", "root",
+    "source_relative", "destination_relative", "target_relative",
+    "artifact_sha256", "size_bytes", "source_identity",
+    "snapshot_relative", "snapshot_sha256", "prepared_at",
+    "related_operation_id", "plan_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "operation_id": { "type": "string", "format": "uuid" },
+    "operation": { "enum": ["quarantine", "restore"] },
+    "root": { "type": "string", "minLength": 1 },
+    "source_relative": { "type": "string", "minLength": 1 },
+    "destination_relative": { "type": "string", "minLength": 1 },
+    "target_relative": { "type": "string", "minLength": 1 },
+    "artifact_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "size_bytes": { "type": "integer", "minimum": 0 },
+    "source_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["device", "inode", "size_bytes", "mtime_ns", "mode", "link_count"],
+      "properties": {
+        "device": { "type": "integer", "minimum": 0 },
+        "inode": { "type": "integer", "minimum": 0 },
+        "size_bytes": { "type": "integer", "minimum": 0 },
+        "mtime_ns": { "type": "integer", "minimum": 0 },
+        "mode": { "type": "integer", "minimum": 0 },
+        "link_count": { "const": 1 }
+      }
+    },
+    "snapshot_relative": { "type": "string", "minLength": 1 },
+    "snapshot_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "prepared_at": { "type": "string", "format": "date-time" },
+    "related_operation_id": { "type": "string" },
+    "plan_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}
