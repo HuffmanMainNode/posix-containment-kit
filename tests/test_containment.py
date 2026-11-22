@@ -216,5 +216,26 @@ class ContainmentTests(unittest.TestCase):
         validate("containment-record.schema.json", containment.read_json(record_path))
 
 
+    def test_type_confused_plan_operation_is_rejected(self):
+        plan = containment.prepare_quarantine(self.root, "sample.txt")
+        value = containment.read_json(plan)
+        value["operation"] = []
+        plan.write_text(json.dumps(value), encoding="utf-8")
+        with self.assertRaises(containment.ContainmentError):
+            containment.show_plan(plan)
+
+    def test_modified_approval_cannot_authorize_plan(self):
+        plan = containment.prepare_quarantine(self.root, "sample.txt")
+        self.approve(plan)
+        loaded = containment.read_json(plan)
+        approval_path = self.root / containment.STATE_DIR / "approvals" / (loaded["operation_id"] + ".json")
+        approval = containment.read_json(approval_path)
+        approval["plan_sha256"] = "0" * 64
+        approval_path.write_text(json.dumps(approval), encoding="utf-8")
+        with self.assertRaises(containment.ContainmentError):
+            containment.apply_plan(plan)
+        self.assertTrue(self.target.exists())
+
+
 if __name__ == "__main__":
     unittest.main()
