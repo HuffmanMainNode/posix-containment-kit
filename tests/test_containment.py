@@ -172,5 +172,24 @@ class ContainmentTests(unittest.TestCase):
         self.assertTrue(self.target.exists())
 
 
+    def test_rollback_restores_from_prechange_snapshot_not_quarantine_copy(self):
+        original = self.target.read_bytes()
+        plan = containment.prepare_quarantine(self.root, "sample.txt")
+        self.approve(plan)
+        containment.apply_plan(plan)
+        containment.verify_plan(plan)
+        containment.record_outcome(plan)
+        loaded = containment.read_json(plan)
+        quarantined = self.root / loaded["destination_relative"]
+        quarantined.write_bytes(b"quarantine copy altered")
+        restore_plan = containment.prepare_rollback(plan)
+        self.approve(restore_plan)
+        containment.apply_plan(restore_plan)
+        self.assertEqual(containment.verify_plan(restore_plan)["status"], "verified")
+        containment.record_outcome(restore_plan)
+        self.assertEqual(self.target.read_bytes(), original)
+        self.assertEqual(quarantined.read_bytes(), b"quarantine copy altered")
+
+
 if __name__ == "__main__":
     unittest.main()
