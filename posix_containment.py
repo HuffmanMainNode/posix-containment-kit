@@ -10,10 +10,7 @@ import argparse
 import hashlib
 import json
 import os
-import shutil
 import stat
-import sys
-import tempfile
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
